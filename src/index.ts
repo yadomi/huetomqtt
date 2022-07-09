@@ -86,8 +86,19 @@ function HTTPEndpoint(...parts: string[]) {
   return ["resource", ...parts].join("/");
 }
 
+async function init (mqtt: MQTT.MqttClient) {
+  for (const resource of RESOURCES) {
+    const response = await hue.get(HTTPEndpoint(resource));
+    mqtt.publish(MQTTEndpoint(resource), format(response.data), { retain: true })
+  }
+}
+
 mqtt.on("connect", async function () {
   log.info("[MQTT]", "Connected to broker");
+
+  if (config.huetomqtt.autoPublishOnConnect) {
+    await init(mqtt);
+  }
 
   mqtt.subscribe([config.huetomqtt.prefix, "resource", "+", "get"].join("/"));
   mqtt.subscribe([config.huetomqtt.prefix, "resource", "+", "+", "get"].join("/"));
