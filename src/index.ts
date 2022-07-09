@@ -106,7 +106,6 @@ mqtt.on("connect", async function () {
 
   mqtt.subscribe([config.huetomqtt.prefix, "resource", "+", "get"].join("/"));
   mqtt.subscribe([config.huetomqtt.prefix, "resource", "+", "+", "get"].join("/"));
-  mqtt.subscribe([config.huetomqtt.prefix, "resource", "+", "set"].join("/"));
   mqtt.subscribe([config.huetomqtt.prefix, "resource", "+", "+", "set"].join("/"));
 
   const router = wayfarer();
