@@ -93,6 +93,10 @@ async function init (mqtt: MQTT.MqttClient) {
   }
 }
 
+mqtt.on('close', (...args) => log.debug('close', ...args))
+mqtt.on('disconnect', (...args) => log.info('[MQTT] Disconnected', ...args))
+mqtt.on('error', (...args) => log.error('error', ...args))
+
 mqtt.on("connect", async function () {
   log.info("[MQTT]", "Connected to broker");
 
