@@ -1,0 +1,23 @@
+{
+  "name": "huetomqtt",
+  "version": "0.0.1",
+  "description": "MQTT bridge for Philips Hue",
+  "main": "dist/index.js",
+  "license": "MIT",
+  "scripts": {
+    "start": "node .",
+    "dev": "tsc && node . ./config.json",
+    "watch": "nodemon -e ts --exec yarn dev"
+  },
+  "dependencies": {
+    "axios": "^0.27.2",
+    "loglevel": "^1.8.0",
+    "mqtt": "^4.3.7",
+    "wayfarer": "^7.0.1"
+  },
+  "devDependencies": {
+    "@types/node": "^18.0.3",
+    "nodemon": "^2.0.19",
+    "typescript": "^4.7.4"
+  }
+}
