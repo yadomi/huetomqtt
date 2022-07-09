@@ -35,7 +35,6 @@ function getConfig(): Config {
 }
 
 const config = getConfig();
-console.log({ config });
 log.setLevel(config.huetomqtt.loglevel);
 
 const mqtt = MQTT.connect(config.mqtt);
