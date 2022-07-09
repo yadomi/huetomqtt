@@ -1,7 +1,7 @@
 {
   "name": "huetomqtt",
   "version": "0.0.1",
-  "description": "MQTT bridge for Philips Hue",
+  "description": "MQTT bridge for Philips Hue v2 API",
   "main": "dist/index.js",
   "license": "MIT",
   "scripts": {
