@@ -6,8 +6,8 @@
   "license": "MIT",
   "scripts": {
     "start": "node .",
-    "dev": "tsc && node . ./config.json",
-    "watch": "nodemon -e ts --exec yarn dev"
+    "build": "tsc",
+    "watch": "nodemon -e ts --exec \"yarn build && yarn start ./config.json\""
   },
   "dependencies": {
     "axios": "^0.27.2",
