@@ -13,4 +13,4 @@ RUN ls -la
 
 RUN yarn build && rm -rf src/
 
-ENTRYPOINT [ "yarn", "start" ]
+ENTRYPOINT [ "yarn", "start", "/etc/config.json" ]
