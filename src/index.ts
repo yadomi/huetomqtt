@@ -48,7 +48,9 @@ const hue = Axios.create({
 });
 
 function HTTPEndpoint(...parts: string[]) {
-  return ["resource", ...parts].join("/");
+  const endpoint = ["resource", ...parts].join("/");
+  log.debug('[HTTP]', {endpoint});
+  return endpoint;
 }
 
 function getResources(pattern: string, resources: any) {
@@ -106,12 +108,13 @@ mqtt.on("connect", async function () {
 
   router.on("/hue/state/refresh", async () => {
     await init();
-    console.log(state, [config.huetomqtt.prefix, "state"].join("/"));
+    log.info({state});
     mqtt.publish([config.huetomqtt.prefix, "state"].join("/"), JSON.stringify(state, null, 2), { retain: true });
   });
 
   router.on("/hue/set", async (params, topic, payload) => {
     const data = JSON.parse(payload.toString());
+    console.log({ data })
     if (!data.match) return;
 
     let resources = [];
@@ -123,16 +126,13 @@ mqtt.on("connect", async function () {
       resources = getResources(data.match.device, room || zone);
     }
 
-    console.log({ resources });
     if (resources.length === 0) return;
 
     for (const resource of resources) {
-      try {
-        const response = await hue.put(HTTPEndpoint(resource.resourceType, resource.id), data.state);
-        console.log(response.data.errors);
-      } catch (error) {
-        log.error(error.response.data.errors);
-      }
+      log.info({ resource });
+      hue.put(HTTPEndpoint(resource.resourceType, resource.id), data.state)
+        .then(res => log.info('[HTTP] response', res.data))
+        .catch(err => log.error(err.response.data.errors))
     }
   });
 
