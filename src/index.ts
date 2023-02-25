@@ -130,7 +130,7 @@ mqtt.on("connect", async function () {
 
     for (const resource of resources) {
       log.info({ resource });
-      hue.put(HTTPEndpoint(resource.resourceType, resource.id), data.state)
+      await hue.put(HTTPEndpoint(resource.resourceType, resource.id), data.state)
         .then(res => log.info('[HTTP] response', res.data))
         .catch(err => log.error(err.response.data.errors))
     }
