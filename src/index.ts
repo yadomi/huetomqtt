@@ -1,23 +1,14 @@
-import MQTT, { IClientOptions } from "mqtt";
+import MQTT from "mqtt";
 import Axios from "axios";
 import https from "https";
 import wayfarer from "wayfarer";
 import log from "loglevel";
 import { resolve } from "path";
-
-type Config = {
-  mqtt: IClientOptions;
-  hue: {
-    bridge: string;
-    token: string;
-  };
-  huetomqtt: {
-    prefix: string;
-    loglevel: log.LogLevelDesc;
-  };
-};
+import { Config, HueHTTPDeviceResponse, HueHTTPLocationResponse, Location, Payload, State } from "./types";
 
 const args = process.argv.slice(2);
+
+const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 function getConfig(): Config {
   const userconfig = require(resolve(args[0]));
@@ -49,27 +40,32 @@ const hue = Axios.create({
 
 function HTTPEndpoint(...parts: string[]) {
   const endpoint = ["resource", ...parts].join("/");
-  log.debug('[HTTP]', {endpoint});
+  log.debug("[HTTP]", { endpoint });
   return endpoint;
 }
 
-function getResources(pattern: string, resources: any) {
+function getResources(pattern: string, locations: Location[] | null[]) {
+  const children = locations
+    .filter(Boolean)
+    .map((location) => location.children)
+    .flat();
+
   if (pattern === "*") {
-    return resources.children;
+    return children;
   } else {
-    return [resources.children.find((device) => device.name === pattern)];
+    return children.filter((device) => new RegExp(pattern).test(device.name));
   }
 }
 
-const state = {
+const state: State = {
   room: [],
   zone: [],
 };
 
 async function init() {
-  const { data: rooms } = await hue.get(HTTPEndpoint("room"));
-  const { data: lights } = await hue.get(HTTPEndpoint("light"));
-  const { data: zones } = await hue.get(HTTPEndpoint("zone"));
+  const { data: lights } = await hue.get<HueHTTPDeviceResponse>(HTTPEndpoint("light"));
+  const { data: rooms } = await hue.get<HueHTTPLocationResponse>(HTTPEndpoint("room"));
+  const { data: zones } = await hue.get<HueHTTPLocationResponse>(HTTPEndpoint("zone"));
 
   state["room"] = rooms.data.map((room) => ({
     name: room.metadata.name,
@@ -108,31 +104,39 @@ mqtt.on("connect", async function () {
 
   router.on("/hue/state/refresh", async () => {
     await init();
-    log.info({state});
+    log.info(JSON.stringify(state, null, 4));
     mqtt.publish([config.huetomqtt.prefix, "state"].join("/"), JSON.stringify(state, null, 2), { retain: true });
   });
 
   router.on("/hue/set", async (params, topic, payload) => {
-    const data = JSON.parse(payload.toString());
-    console.log({ data })
+    const data = JSON.parse(payload.toString()) as Payload;
     if (!data.match) return;
 
-    let resources = [];
-    if (("room" in data.match || "zone" in data.match) && "device" in data.match) {
-      const room = state.room.find((room) => room.name === data.match.room);
-      const zone = state.zone.find((zone) => zone.name === data.match.zone);
-      if (!room && !zone) return;
+    if (!("device" in data.match)) return;
 
-      resources = getResources(data.match.device, room || zone);
-    }
+    const resources = getResources(data.match.device, [
+      ...(data.match.room ? state.room.filter((room) => new RegExp(data.match.room).test(room.name)) : []),
+      ...(data.match.zone ? state.zone.filter((zone) => new RegExp(data.match.zone).test(zone.name)) : []),
+    ]);
 
     if (resources.length === 0) return;
+    console.log({ resources });
+
+    log.info(`Found ${resources.length} resource(s) that match device pattern "${data.match.device}"`);
+    if (log.getLevel() === log.levels.DEBUG) {
+      log.debug("Matched: ");
+      for (const resource of resources) {
+        log.debug(`- ${resource.name} - (${resource.id})`);
+      }
+    }
 
     for (const resource of resources) {
-      log.info({ resource });
-      await hue.put(HTTPEndpoint(resource.resourceType, resource.id), data.state)
-        .then(res => log.info('[HTTP] response', res.data))
-        .catch(err => log.error(err.response.data.errors))
+      await hue
+        .put(HTTPEndpoint(resource.resourceType, resource.id), data.state)
+        .then((res) => log.info("[HTTP] response", res.data))
+        .catch((err) => log.error(err.response.data.errors));
+
+      await wait(250); // Avoid bottleneck on the hub
     }
   });
 
