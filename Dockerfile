@@ -1,16 +1,13 @@
-FROM node:18.5.0-alpine3.15
+FROM denoland/deno:alpine-1.45.5
 
 WORKDIR /app
 
-COPY package.json .
-COPY yarn.lock .
-COPY tsconfig.json .
+COPY deno.lock .
 
-RUN yarn install
-COPY src/ src/
+COPY main.ts .
+COPY types.ts .
 
-RUN ls -la
+RUN deno cache main.ts
 
-RUN yarn build && rm -rf src/
-
-ENTRYPOINT [ "yarn", "start", "/etc/config.json" ]
+# FIXME: use actual certificate
+CMD ["run", "--allow-net", "--allow-env", "--allow-read", "--unsafely-ignore-certificate-errors", "main.ts"]
