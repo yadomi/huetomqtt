@@ -10,54 +10,43 @@ huetomqtt is an MQTT bridge for Philips Hue. It use the Hue V2 API and is almost
 With plain docker:
 
 ```
-docker run yadomi/huetomqtt -v $PWD/config.json:/etc/config.json
+docker run yadomi/huetomqtt:unstable -v $PWD/config.json:/app/config/config.json
 ```
 
-Or with a docker-compose.yml (`docker-compose up`):
-
-
-```
-version: "3.0"
-
-services:
-  mqttbroker:
-    image: eclipse-mosquitto:2.0.11
-  mqtthue:
-    image: yadomi/huetomqtt:latest
-    volumes:
-      - ./config.json:/etc/config.json
-```
 
 ## Configuration file
 
-The configuration file is a JSON file to specify which Hue hub to use and MQTT Broker.
+The configuration file is YML file to specify the Hue hub and MQTT Broker to use.
 
 Example:
 
+```yml
+mqtt:
+  host: mqtt://192.168.10.50
+  options:
+    username: mqttusername
+    password: thisissecure
+
+hue:
+  host: 192.168.10.120
+  key: a_hue_token_but_hue_call_it_username_it_is_very_weird
+
 ```
-{
-  "hue": {
-    "bridge": "192.168.1.80",
-    "token": "..."
-  },
-  "mqtt": {
-    "host": "192.168.1.100",
-    "clientId": "huetomqtt",
-    "username": "brucewayne",
-    "password": "batmobile"
-  },
-  "huetomqtt": {
-    "prefix": "hue",
-  }
-}
+
+You can get a bridge token with cURL :
+
+```sh
+curl 'http://<your_bridge_aip>/api' -X POST --data-raw '{"devicetype":"huetomqtt"}'
 ```
+
+More info at: https://developers.meethue.com/develop/get-started-2/
 
 ### `Config.hue`:
 
 |property       |description|required|default|
 |-|-|-|-|
-| `bridge`  | IP address or domain to the Hue Bridge | `true` | |
-| `token`   | A Hue bridge application key. See official [docs](https://developers.meethue.com/develop/get-started-2/#findme1) | `true` | |
+| `host`  | IP address or domain to the Hue Bridge | `true` | |
+| `key`   | A Hue bridge application key | `true` | |
 
 ### `Config.mqtt`:
 
@@ -65,96 +54,36 @@ The `mqtt` key accept an object that accept any options from [MQTT.js](https://g
 
 https://github.com/mqttjs/MQTT.js/blob/8b0fa591fbe6575ff855ede104f4d35472546167/types/lib/client-options.d.ts#L10
 
-### `Config.huetomqtt`:
-
-|property        |description|required|default|
-|-|-|-|-|
-| `loglevel`            | The level of log, accept any value of [`LogLevel`](https://github.com/pimterry/loglevel/blob/f5a642299bf77a81118d68766a168c9568ecd21b/index.d.ts#L32-L37) | `false` | `info` |
-| `prefix`              | The MQTT prefix used when publishing/subscribing a message | `false` | `hue` |
 
 ### API
 
-The bridge will respond to the following topics:
 
-#### `/<prefix>/set`
+This app subcribe to `<prefix>/+/+` and will act as follow based on how lights are configured in the Hue app:
 
-Set state of a specific resourced defined by a matcher.
+The topic act as follow: `<prefix>/<resourceType>/<resourceName>`
 
-##### payload:
+supported `resourceType`:
+https://github.com/yadomi/huetomqtt/blob/79b4a535514c8ea7be2c6391fc2c670b190098b8/types.ts#L3
 
-```json
- {
-  "match": {
-    "room": "Room", // The room name, as displayed in the Philips Hue app
-    "device": "RGB Strip" // The device/appliance name, as displayed in the Philips Hue app. Use * for all lights in the room
-  },
-  "state": {} // A valid HTTP Hue API payload. See: https://developers.meethue.com/develop/hue-api-v2/api-reference/
- }
-```
 
-##### Examples
+Example, to turn on the light named "Ruban TV", you can publish:
 
-To turn on all the lights in a room called `Chambre`:
+- topic: `<prefix>/light/ruban_tv`
+- payload: `{ state: "ON" }`
 
-```json
- {
-  "match": {
-    "room": "Chambre",
-    "device": "*"
-  },
-  "state": {
-    "on": {
-      "on": true
-    }
-  }
- }
-```
+You can also control a whole room:
 
-To turn on at 50% brightness the light called `RGB Strip` in a room called `Séjour`:
+- topic: `<prefix>/room/cuisine`
+- payload: `{ state: "ON" }`
 
-```json
- {
-  "match": {
-    "room": "Séjour",
-    "device": "RGB Strip"
-  },
-  "state": {
-    "on": {
-      "on": true
-    },
-    "dimming": {
-      "brightness": 100,
-    }
-  }
- }
-```
+Each resources (rooms, lights, zone ect...) are slugified and will match the closest match.
+Example, if in the app you have a room called "Salle de jeux", you'll have to use "salle_de_jeux" in the topic.
 
-To set color temp of all lights in a zone named `TV`:
+To control the brightness or color temperature:
 
-```json
- {
-  "match": {
-    "zone": "Séjour",
-    "device": "*"
-  },
-  "state": {
-    "on": {
-      "on": true
-    },
-    "color_temperature": {
-      "mirek": 200
-    }
-  }
- }
-```
+- topic: `<prefix>/zone/cuisine`
+- payload: `{ brightness: 128, color_temp: 400 }`
 
---
+For a descriptive list of what can be sent in the payload, take a look at the type definition:
 
-#### `/<prefix>/state/refresh`
-
-Refresh the internal state. This initialized at start by default.
-You can publish this topic when adding/renaming a new room, zone or devices etc. in the Philips Hue app.
-
-##### payload:
-
-`none`
+https://github.com/yadomi/huetomqtt/blob/79b4a535514c8ea7be2c6391fc2c670b190098b8/types.ts#L34-L42
